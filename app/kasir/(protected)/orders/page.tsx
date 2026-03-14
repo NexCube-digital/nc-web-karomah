@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
+import { useRouter } from "next/navigation";
 import {
   createOrder,
   fetchCashierOrders,
@@ -22,6 +23,7 @@ const cashierStatusActions: Array<{ label: string; value: Order["status"] }> = [
 ];
 
 export default function CashierOrdersPage() {
+  const router = useRouter();
   const { token, printerConnected } = useCashierContext();
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -198,15 +200,6 @@ export default function CashierOrdersPage() {
     setDraftItems([]);
   }
 
-  function openCreateModal() {
-    resetOrderForm();
-    setIsOrderModalOpen(true);
-    setErrorMessage(null);
-    if (products.length === 0) {
-      void loadProducts();
-    }
-  }
-
   function openEditModal(order: Order) {
     setEditingOrderId(order.id);
     setIsOrderModalOpen(true);
@@ -337,7 +330,7 @@ export default function CashierOrdersPage() {
             />
             <button
               type="button"
-              onClick={openCreateModal}
+              onClick={() => router.push("/kasir/orders/new")}
               className="rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-500"
             >
               Tambah pesanan

@@ -19,11 +19,19 @@ import {
 import { clearAuthSession, getPrinterReady, setPrinterReady } from "@/lib/auth";
 import { useCashierSession } from "@/app/kasir/_hooks/useCashierSession";
 import { CashierContextProvider } from "@/app/kasir/_context/CashierContext";
-import { useEffect, useRef, useState } from "react";
+import { CartItem, Product } from "@/types";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 const navItems = [
   { href: "/kasir", label: "Ringkasan", icon: LayoutDashboard },
-  { href: "/kasir/orders", label: "Antrean Order", icon: ReceiptText },
+  {
+    label: "Antrean",
+    icon: ReceiptText,
+    children: [
+      { href: "/kasir/orders", label: "Order" },
+      { href: "/kasir/orders/new", label: "Baru" },
+    ],
+  },
   { href: "/kasir/history", label: "Riwayat", icon: History },
   { href: "/kasir/categories", label: "Kategori", icon: Layers3 },
   { href: "/kasir/menu", label: "Kelola Menu", icon: UtensilsCrossed },
@@ -35,6 +43,11 @@ const headerCopyByRoute: Array<{
   eyebrow: string;
   title: string;
 }> = [
+  {
+    href: "/kasir/orders/new",
+    eyebrow: "Area Antrean",
+    title: "Tambah pesanan baru",
+  },
   {
     href: "/kasir/orders",
     eyebrow: "Area Antrean",
@@ -76,8 +89,11 @@ export default function ProtectedCashierLayout({
   const pathname = usePathname();
   const { token, user, isChecking } = useCashierSession();
   const [printerConnected, setPrinterConnectedState] = useState(getPrinterReady);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isQueueMenuOpen, setIsQueueMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const isQueueMenuExpanded = pathname.startsWith("/kasir/orders") || isQueueMenuOpen;
 
   const headerCopy =
     headerCopyByRoute.find((item) => item.href !== "/kasir" && pathname.startsWith(item.href)) ||
@@ -99,8 +115,37 @@ export default function ProtectedCashierLayout({
 
   function logout() {
     clearAuthSession();
+    setCartItems([]);
     setIsProfileMenuOpen(false);
     router.replace("/kasir/login");
+  }
+
+  function addCartItem(product: Product) {
+    setCartItems((currentCart) => {
+      const existingItem = currentCart.find((item) => item.id === product.id);
+
+      if (existingItem) {
+        return currentCart.map((item) =>
+          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+
+      return [...currentCart, { ...product, quantity: 1 }];
+    });
+  }
+
+  function updateCartItemQuantity(productId: number, delta: number) {
+    setCartItems((currentCart) =>
+      currentCart
+        .map((item) =>
+          item.id === productId ? { ...item, quantity: item.quantity + delta } : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+  }
+
+  function clearCartItems() {
+    setCartItems([]);
   }
 
   async function connectPrinter() {
@@ -148,6 +193,10 @@ export default function ProtectedCashierLayout({
         setPrinterConnected: setPrinterConnectedState,
         connectPrinter,
         logout,
+        cartItems,
+        addCartItem,
+        updateCartItemQuantity,
+        clearCartItems,
       }}
     >
       <main className="min-h-screen bg-slate-100 text-slate-900">
@@ -168,6 +217,57 @@ export default function ProtectedCashierLayout({
             <nav className="flex-1 space-y-2 px-4 py-5">
               {navItems.map((item) => {
                 const Icon = item.icon;
+
+                if ("children" in item) {
+                  const parentActive = item.children.some((child) => pathname === child.href);
+
+                  return (
+                    <div key={item.label} className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsQueueMenuOpen((current) => !current)}
+                        className={`flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                          parentActive
+                            ? "bg-orange-400 text-slate-950"
+                            : "text-slate-200 hover:bg-white/8 hover:text-white"
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-3">
+                          <Icon className="h-4 w-4" />
+                          {item.label}
+                        </span>
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform ${
+                            isQueueMenuExpanded ? "rotate-180" : "rotate-0"
+                          }`}
+                        />
+                      </button>
+
+                      {isQueueMenuExpanded && (
+                        <div className="space-y-1 pl-6">
+                          {item.children.map((child) => {
+                            const childActive = pathname === child.href;
+
+                            return (
+                              <Link
+                                key={child.href}
+                                href={child.href}
+                                className={`block rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                                  childActive
+                                    ? "bg-orange-200 text-slate-950"
+                                    : "text-slate-300 hover:bg-white/8 hover:text-white"
+                                }`}
+                              >
+                                {child.label}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
                 const active = pathname === item.href;
 
                 return (
@@ -266,6 +366,32 @@ export default function ProtectedCashierLayout({
                 <div className="flex gap-1 overflow-x-auto">
                   {navItems.map((item) => {
                     const Icon = item.icon;
+
+                    if ("children" in item) {
+                      return (
+                        <Fragment key={item.label}>
+                          {item.children.map((child) => {
+                            const active = pathname === child.href;
+
+                            return (
+                              <Link
+                                key={child.href}
+                                href={child.href}
+                                className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                                  active
+                                    ? "bg-orange-400 text-slate-950"
+                                    : "bg-white/5 text-slate-200 hover:bg-white/10 hover:text-white"
+                                }`}
+                              >
+                                <Icon className="h-4 w-4" />
+                                {item.label}: {child.label}
+                              </Link>
+                            );
+                          })}
+                        </Fragment>
+                      );
+                    }
+
                     const active = pathname === item.href;
 
                     return (

@@ -33,7 +33,54 @@ function normalizeImageUrl(imageUrl: string | null | undefined) {
     return DEFAULT_PRODUCT_IMAGE;
   }
 
+  if (/^https?:\/\//i.test(normalizedValue) || normalizedValue.startsWith("data:")) {
+    return normalizedValue;
+  }
+
+  if (normalizedValue.startsWith("/")) {
+    try {
+      return new URL(normalizedValue, api.defaults.baseURL || "http://localhost:4000/api").toString();
+    } catch {
+      return normalizedValue;
+    }
+  }
+
   return normalizedValue;
+}
+
+function buildMenuFormData(payload: MenuPayload) {
+  const formData = new FormData();
+
+  formData.append("name", payload.name);
+  formData.append("category", payload.category);
+  formData.append("price", String(payload.price));
+  formData.append("isAvailable", String(payload.isAvailable));
+
+  if (typeof payload.description === "string") {
+    formData.append("description", payload.description);
+  }
+
+  if (payload.removeImage) {
+    formData.append("removeImage", "true");
+  }
+
+  if (payload.imageFile) {
+    formData.append("image", payload.imageFile);
+  }
+
+  return formData;
+}
+
+function multipartAuthConfig(token?: string) {
+  const config = authConfig(token);
+
+  return {
+    ...(config || {}),
+    headers: {
+      ...(config?.headers || {}),
+      "Content-Type": "multipart/form-data",
+    },
+  };
 }
 
 function normalizeProduct(product: Product) {
@@ -187,20 +234,22 @@ export async function deleteCategory(id: number, token?: string) {
 }
 
 export async function createMenuItem(payload: MenuPayload, token?: string) {
+  const formData = buildMenuFormData(payload);
   const response = await api.post<{ success: boolean; data: Product }>(
     "/products",
-    payload,
-    authConfig(token)
+    formData,
+    multipartAuthConfig(token)
   );
 
   return normalizeProduct(response.data.data);
 }
 
 export async function updateMenuItem(id: number, payload: MenuPayload, token?: string) {
+  const formData = buildMenuFormData(payload);
   const response = await api.put<{ success: boolean; data: Product }>(
     `/products/${id}`,
-    payload,
-    authConfig(token)
+    formData,
+    multipartAuthConfig(token)
   );
 
   return normalizeProduct(response.data.data);

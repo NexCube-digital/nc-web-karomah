@@ -66,7 +66,9 @@ export type MenuPayload = {
   description?: string;
   category: string;
   price: number;
-  imageUrl?: string;
+  imageUrl?: string | null;
+  imageFile?: File | null;
+  removeImage?: boolean;
   isAvailable: boolean;
 };
 
