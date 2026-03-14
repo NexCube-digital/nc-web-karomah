@@ -7,6 +7,7 @@ import {
   LoginResponse,
   MenuPayload,
   Order,
+  OrderHistoryGroup,
   Product,
   ReceiptPayload,
 } from "@/types";
@@ -19,10 +20,27 @@ const api = axios.create({
   },
 });
 
+const DEFAULT_PRODUCT_IMAGE = "/image/default.png";
+
+function normalizeImageUrl(imageUrl: string | null | undefined) {
+  if (typeof imageUrl !== "string") {
+    return DEFAULT_PRODUCT_IMAGE;
+  }
+
+  const normalizedValue = imageUrl.trim();
+
+  if (!normalizedValue || normalizedValue.toLowerCase() === "null") {
+    return DEFAULT_PRODUCT_IMAGE;
+  }
+
+  return normalizedValue;
+}
+
 function normalizeProduct(product: Product) {
   return {
     ...product,
     price: Number(product.price),
+    imageUrl: normalizeImageUrl(product.imageUrl),
   };
 }
 
@@ -57,6 +75,12 @@ function normalizeOrder(order: Order) {
       lineTotal: Number(item.lineTotal),
     })),
   };
+}
+
+export function getCashierEventsUrl(token: string) {
+  const baseUrl = api.defaults.baseURL || "http://localhost:4000/api";
+  const separator = baseUrl.includes("?") ? "&" : "?";
+  return `${baseUrl}/cashier/events${separator}token=${encodeURIComponent(token)}`;
 }
 
 export async function fetchProducts() {
@@ -188,7 +212,9 @@ export async function deleteMenuItem(id: number, token?: string) {
 
 export async function updateCashierOrder(
   id: number,
-  payload: Partial<Pick<Order, "status" | "paymentStatus">>,
+  payload: Partial<Pick<Order, "status" | "paymentStatus" | "customerName" | "notes" | "paymentMethod">> & {
+    items?: Array<{ productId: number; quantity: number }>;
+  },
   token?: string
 ) {
   const response = await api.patch<{ success: boolean; message: string; data: Order }>(
@@ -197,6 +223,18 @@ export async function updateCashierOrder(
     authConfig(token)
   );
   return normalizeOrder(response.data.data);
+}
+
+export async function fetchCashierHistory(token?: string) {
+  const response = await api.get<{ success: boolean; data: OrderHistoryGroup[] }>(
+    "/cashier/history",
+    authConfig(token)
+  );
+  return response.data.data.map((group) => ({
+    ...group,
+    totalRevenue: Number(group.totalRevenue),
+    orders: group.orders.map(normalizeOrder),
+  }));
 }
 
 export async function fetchReceipt(id: number, token?: string) {

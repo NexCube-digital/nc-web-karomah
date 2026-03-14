@@ -8,6 +8,7 @@
  import { createOrder, fetchCategories, fetchProducts } from "@/lib/api";
  import { formatCurrency } from "@/lib/utils";
  import { CartItem, Category, Order, Product } from "@/types";
+import { ProductThumbnail } from "@/components/ProductThumbnail";
 
  function toCategoryId(category: string) {
    return `kategori-${category.toLowerCase().replace(/\s+/g, "-")}`;
@@ -323,41 +324,49 @@ function getMockRating(productId: number) {
                    </span>
                  </div>
 
-                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                 <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-5">
                    {items.map((product) => (
                      <article
                        key={product.id}
-                       className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-3 shadow-sm transition hover:shadow-md"
+                       className="overflow-hidden rounded-[28px] border border-slate-200 bg-white p-2.5 shadow-sm transition hover:shadow-md"
                      >
-                       <div
-                         className="relative h-40 overflow-hidden rounded-2xl bg-slate-100"
-                         style={{
-                           backgroundImage: `url(${product.imageUrl || "/image/default.png"})`,
-                           backgroundSize: "cover",
-                           backgroundPosition: "center",
-                         }}
-                       >
-                         <div className="absolute bottom-3 right-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-slate-900 shadow-sm">
-                           ⭐ {getMockRating(product.id)}
-                         </div>
-                       </div>
-                       <div className="space-y-3 p-3">
-                         <div>
-                           <h3 className="text-2xl font-bold text-slate-950">{product.name}</h3>
-                           <p className="mt-1 text-sm leading-6 text-slate-600">
-                             {product.description || "Menu andalan siap dipesan."}
-                           </p>
-                           <p className="mt-1 text-sm text-slate-500">{product.category}</p>
-                         </div>
-                         <div className="flex items-center justify-between gap-4">
-                           <p className="text-lg font-bold text-slate-950">{formatCurrency(product.price)}</p>
-                           <button
-                             type="button"
-                             onClick={() => addToCart(product)}
-                             className="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-500"
-                           >
-                             Tambah
-                           </button>
+                       <div className="flex items-stretch gap-4 md:block md:gap-0">
+                         <ProductThumbnail
+                           src={product.imageUrl}
+                           alt={product.name}
+                                className="relative h-32 w-32 shrink-0 overflow-hidden rounded-3xl bg-slate-100 md:h-28 md:w-full md:rounded-2xl xl:h-32"
+                           overlay={
+                             <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-slate-900 shadow-sm">
+                               ★ {getMockRating(product.id)}
+                             </div>
+                           }
+                         />
+                         <div className="flex min-w-0 flex-1 flex-col justify-between py-1 md:space-y-2 md:p-2.5">
+                           <div>
+                             <div className="flex items-start justify-between gap-3">
+                               <div className="min-w-0">
+                                 <h3 className="line-clamp-2 text-lg font-bold leading-tight text-slate-950 md:text-xl">
+                                   {product.name}
+                                 </h3>
+                                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600 md:mt-1 md:line-clamp-2 md:text-[13px] md:leading-5">
+                                   {product.description || "Menu andalan siap dipesan."}
+                                 </p>
+                               </div>
+                             </div>
+                             <p className="mt-2 text-sm font-medium text-slate-500 md:text-xs">{product.category}</p>
+                           </div>
+                           <div className="mt-3 flex items-center justify-between gap-3 md:mt-0 md:gap-2">
+                             <p className="text-base font-bold text-slate-950 md:text-sm xl:text-base">
+                               {formatCurrency(product.price)}
+                             </p>
+                             <button
+                               type="button"
+                               onClick={() => addToCart(product)}
+                               className="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-500 md:px-3 md:py-1.5 md:text-xs"
+                             >
+                               Tambah
+                             </button>
+                           </div>
                          </div>
                        </div>
                      </article>

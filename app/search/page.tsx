@@ -7,6 +7,12 @@ import axios from "axios";
 import { fetchProducts } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { Product } from "@/types";
+import { ProductThumbnail } from "@/components/ProductThumbnail";
+
+function getMockRating(productId: number) {
+  const rating = 4.6 + (productId % 5) * 0.1;
+  return Math.min(rating, 5).toFixed(1);
+}
 
 export default function SearchPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -119,27 +125,38 @@ export default function SearchPage() {
             {filteredProducts.map((product) => (
               <article
                 key={product.id}
-                className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm"
+                className="overflow-hidden rounded-[30px] border border-slate-200 bg-white p-3 shadow-sm"
               >
-                <div
-                  className="h-28 bg-slate-100"
-                  style={{
-                    backgroundImage: `url(${product.imageUrl || "/image/default.png"})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }}
-                />
-                <div className="space-y-3 p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-lg font-bold text-slate-950">{product.name}</h2>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {product.category}
-                    </span>
+                <div className="flex items-stretch gap-4 md:block md:gap-0">
+                  <ProductThumbnail
+                    src={product.imageUrl}
+                    alt={product.name}
+                    className="relative h-32 w-32 shrink-0 overflow-hidden rounded-3xl bg-slate-100 md:h-40 md:w-full md:rounded-2xl"
+                    overlay={
+                      <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-slate-900 shadow-sm">
+                        ★ {getMockRating(product.id)}
+                      </div>
+                    }
+                  />
+                  <div className="flex min-w-0 flex-1 flex-col justify-between py-1 md:space-y-3 md:p-3">
+                    <div>
+                      <h2 className="line-clamp-2 text-lg font-bold leading-tight text-slate-950 md:text-2xl">
+                        {product.name}
+                      </h2>
+                      <p className="mt-2 text-sm font-medium text-slate-500">{product.category}</p>
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600 md:line-clamp-3">
+                        {product.description || "Menu andalan siap dipesan."}
+                      </p>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-3 md:mt-0">
+                      <p className="text-base font-bold text-slate-950 md:text-lg">
+                        {formatCurrency(product.price)}
+                      </p>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                        {product.category}
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-sm leading-6 text-slate-600">
-                    {product.description || "Menu andalan siap dipesan."}
-                  </p>
-                  <p className="text-base font-bold text-slate-950">{formatCurrency(product.price)}</p>
                 </div>
               </article>
             ))}

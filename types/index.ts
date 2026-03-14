@@ -87,3 +87,10 @@ export type ReceiptPayload = {
   }>;
   printableText: string;
 };
+
+export type OrderHistoryGroup = {
+  date: string; // YYYY-MM-DD
+  orders: Order[];
+  totalOrders: number;
+  totalRevenue: number;
+};
