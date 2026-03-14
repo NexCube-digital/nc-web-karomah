@@ -324,31 +324,31 @@ function getMockRating(productId: number) {
                    </span>
                  </div>
 
-                 <div className="grid gap-3 md:grid-cols-4 xl:grid-cols-5">
+                 <div className="grid items-stretch gap-3 md:grid-cols-4 xl:grid-cols-5">
                    {items.map((product) => (
                      <article
                        key={product.id}
-                       className="overflow-hidden rounded-[28px] border border-slate-200 bg-white p-2.5 shadow-sm transition hover:shadow-md"
+                       className="h-full overflow-hidden rounded-[28px] border border-slate-200 bg-white p-2.5 shadow-sm transition hover:shadow-md"
                      >
-                       <div className="flex items-stretch gap-4 md:block md:gap-0">
+                       <div className="flex h-full items-stretch gap-4 md:flex-col md:gap-0">
                          <ProductThumbnail
                            src={product.imageUrl}
                            alt={product.name}
-                                className="relative h-32 w-32 shrink-0 overflow-hidden rounded-3xl bg-slate-100 md:h-28 md:w-full md:rounded-2xl xl:h-32"
+                            className="relative h-32 w-32 shrink-0 overflow-hidden rounded-3xl bg-slate-100 md:h-28 md:w-full md:rounded-2xl xl:h-32"
                            overlay={
                              <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-slate-900 shadow-sm">
                                ★ {getMockRating(product.id)}
                              </div>
                            }
                          />
-                         <div className="flex min-w-0 flex-1 flex-col justify-between py-1 md:space-y-2 md:p-2.5">
+                         <div className="flex min-w-0 flex-1 flex-col justify-between py-1 md:p-2.5">
                            <div>
                              <div className="flex items-start justify-between gap-3">
                                <div className="min-w-0">
                                  <h3 className="line-clamp-2 text-lg font-bold leading-tight text-slate-950 md:text-xl">
                                    {product.name}
                                  </h3>
-                                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600 md:mt-1 md:line-clamp-2 md:text-[13px] md:leading-5">
+                                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600 md:mt-1 md:min-h-10 md:line-clamp-2 md:text-[13px] md:leading-5">
                                    {product.description || "Menu andalan siap dipesan."}
                                  </p>
                                </div>
