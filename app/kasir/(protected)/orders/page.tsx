@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import {
   createOrder,
   fetchCashierOrders,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { Order, Product } from "@/types";
+import { CrudToast } from "@/components/CrudToast";
 import { useCashierContext } from "@/app/kasir/_context/CashierContext";
 import { escapeHtml, paymentLabels } from "@/app/kasir/_lib/cashierConstants";
 import { useCashierEvents } from "@/app/kasir/_hooks/useCashierEvents";
@@ -36,7 +38,14 @@ export default function CashierOrdersPage() {
   const [paymentMethod, setPaymentMethod] = useState<Order["paymentMethod"]>("cash");
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
-  const [draftItems, setDraftItems] = useState<Array<{ productId: number; quantity: number }>>([]);
+  const [draftItems, setDraftItems] = useState<
+    Array<{ productId: number; quantity: number; chickenCut?: "dada" | "paha" }>
+  >([]);
+  const [pendingChickenItem, setPendingChickenItem] = useState<{
+    productId: number;
+    productName: string;
+    quantity: number;
+  } | null>(null);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -70,6 +79,19 @@ export default function CashierOrdersPage() {
     enabled: Boolean(token),
     onEvent: refreshOrders,
   });
+
+  useEffect(() => {
+    if (!feedback && !errorMessage) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setFeedback(null);
+      setErrorMessage(null);
+    }, 4500);
+
+    return () => window.clearTimeout(timeout);
+  }, [feedback, errorMessage]);
 
   const filteredOrders = useMemo(() => {
     const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -111,11 +133,20 @@ export default function CashierOrdersPage() {
         return {
           ...item,
           product,
+          label: `${product.name}${item.chickenCut ? ` - ${item.chickenCut === "dada" ? "Dada" : "Paha"}` : ""}`,
           lineTotal: product.price * item.quantity,
         };
       })
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
   }, [draftItems, products]);
+
+  const editingOrder = useMemo(
+    () => orders.find((order) => order.id === editingOrderId) || null,
+    [orders, editingOrderId]
+  );
+
+  const actionButtonClass =
+    "inline-flex min-w-[124px] items-center justify-center rounded-2xl px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50";
 
   async function handleMarkPaid(orderId: number) {
     try {
@@ -132,9 +163,15 @@ export default function CashierOrdersPage() {
     }
   }
 
-  async function handleCancelOrder(orderId: number) {
+  async function handleCancelOrder(orderId: number, options?: { skipConfirm?: boolean }) {
+    if (!options?.skipConfirm) {
+      const confirmed = window.confirm("Pesanan akan dibatalkan. Lanjutkan?");
+      if (!confirmed) {
+        return;
+      }
+    }
+
     try {
-      window.alert("Pesanan akan dibatalkan.");
       await updateCashierOrder(orderId, { status: "cancelled" }, token);
       setFeedback("Pesanan berhasil dibatalkan.");
       setErrorMessage(null);
@@ -208,7 +245,13 @@ export default function CashierOrdersPage() {
     setPaymentMethod(order.paymentMethod);
     setSelectedProductId(null);
     setSelectedQuantity(1);
-    setDraftItems(order.items.map((item) => ({ productId: item.productId, quantity: item.quantity })));
+    setDraftItems(
+      order.items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        chickenCut: item.chickenCut || undefined,
+      }))
+    );
     setErrorMessage(null);
     if (products.length === 0) {
       void loadProducts();
@@ -217,7 +260,44 @@ export default function CashierOrdersPage() {
 
   function closeOrderModal() {
     setIsOrderModalOpen(false);
+    setPendingChickenItem(null);
     resetOrderForm();
+  }
+
+  function upsertDraftItem(productId: number, quantity: number, chickenCut?: "dada" | "paha") {
+    setDraftItems((currentItems) => {
+      const existingItem = currentItems.find(
+        (item) => item.productId === productId && item.chickenCut === chickenCut
+      );
+
+      if (existingItem) {
+        return currentItems.map((item) =>
+          item.productId === productId && item.chickenCut === chickenCut
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
+        );
+      }
+
+      return [...currentItems, { productId, quantity, chickenCut }];
+    });
+  }
+
+  function isAyamGorengProduct(product: Product | undefined) {
+    return product?.category?.trim().toLowerCase() === "ayam goreng";
+  }
+
+  async function handleCancelFromModal() {
+    if (!editingOrderId) {
+      return;
+    }
+
+    const confirmed = window.confirm("Pesanan akan dibatalkan. Lanjutkan?");
+    if (!confirmed) {
+      return;
+    }
+
+    await handleCancelOrder(editingOrderId, { skipConfirm: true });
+    closeOrderModal();
   }
 
   function addDraftItem() {
@@ -225,28 +305,38 @@ export default function CashierOrdersPage() {
       return;
     }
 
-    setDraftItems((currentItems) => {
-      const existingItem = currentItems.find((item) => item.productId === selectedProductId);
+    const selectedProduct = products.find((product) => product.id === selectedProductId);
+    if (isAyamGorengProduct(selectedProduct)) {
+      setPendingChickenItem({
+        productId: selectedProductId,
+        productName: selectedProduct?.name || "Ayam Goreng",
+        quantity: selectedQuantity,
+      });
+      return;
+    }
 
-      if (existingItem) {
-        return currentItems.map((item) =>
-          item.productId === selectedProductId
-            ? { ...item, quantity: item.quantity + selectedQuantity }
-            : item
-        );
-      }
-
-      return [...currentItems, { productId: selectedProductId, quantity: selectedQuantity }];
-    });
+    upsertDraftItem(selectedProductId, selectedQuantity);
 
     setSelectedQuantity(1);
   }
 
-  function updateDraftQuantity(productId: number, delta: number) {
+  function handleChooseChickenCut(cut: "dada" | "paha") {
+    if (!pendingChickenItem) {
+      return;
+    }
+
+    upsertDraftItem(pendingChickenItem.productId, pendingChickenItem.quantity, cut);
+    setPendingChickenItem(null);
+    setSelectedQuantity(1);
+  }
+
+  function updateDraftQuantity(productId: number, delta: number, chickenCut?: "dada" | "paha") {
     setDraftItems((currentItems) =>
       currentItems
         .map((item) =>
-          item.productId === productId ? { ...item, quantity: item.quantity + delta } : item
+          item.productId === productId && item.chickenCut === chickenCut
+            ? { ...item, quantity: item.quantity + delta }
+            : item
         )
         .filter((item) => item.quantity > 0)
     );
@@ -303,17 +393,14 @@ export default function CashierOrdersPage() {
 
   return (
     <>
-      {(feedback || errorMessage) && (
-        <div
-          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
-            errorMessage
-              ? "border-rose-200 bg-rose-50 text-rose-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {errorMessage || feedback}
-        </div>
-      )}
+      <CrudToast
+        message={errorMessage || feedback}
+        isError={Boolean(errorMessage)}
+        onClose={() => {
+          setFeedback(null);
+          setErrorMessage(null);
+        }}
+      />
 
       {isLoading ? (
         <section className="rounded-4xl bg-white p-8 text-sm text-slate-500 shadow-sm ring-1 ring-slate-100">
@@ -360,9 +447,21 @@ export default function CashierOrdersPage() {
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {filteredOrders.map((order) => (
-            <article key={order.id} className="rounded-4xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
+            <article
+              key={order.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => openEditModal(order)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openEditModal(order);
+                }
+              }}
+              className="rounded-4xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-300"
+            >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">
@@ -392,6 +491,7 @@ export default function CashierOrdersPage() {
                   <div key={item.id} className="flex items-center justify-between gap-4">
                     <span>
                       {item.quantity}x {item.productName}
+                      {item.chickenCut ? ` (${item.chickenCut === "dada" ? "Dada" : "Paha"})` : ""}
                     </span>
                     <span>{formatCurrency(item.lineTotal)}</span>
                   </div>
@@ -407,34 +507,24 @@ export default function CashierOrdersPage() {
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => openEditModal(order)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handleMarkPaid(order.id);
+                    }}
                     disabled={order.status !== "pending"}
-                    className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleMarkPaid(order.id)}
-                    disabled={order.status !== "pending"}
-                    className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className={`${actionButtonClass} border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}
                   >
                     {order.status === "completed" ? "Sudah selesai" : "Tandai lunas"}
                   </button>
                   <button
                     type="button"
-                    onClick={() => handlePrint(order.id)}
-                    className="rounded-2xl bg-orange-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-orange-300"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void handlePrint(order.id);
+                    }}
+                    className={`${actionButtonClass} border border-orange-300 bg-orange-100 text-orange-800 hover:bg-orange-200`}
                   >
                     Cetak struk
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleCancelOrder(order.id)}
-                    disabled={order.status !== "pending"}
-                    className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Batal
                   </button>
                 </div>
               </div>
@@ -461,6 +551,11 @@ export default function CashierOrdersPage() {
                 <h3 className="mt-1 text-2xl font-bold text-slate-950">
                   {editingOrderId ? "Edit detail pesanan" : "Tambah pesanan baru"}
                 </h3>
+                {editingOrder && (
+                  <p className="mt-2 text-sm text-slate-500">
+                    No. {editingOrder.orderNumber} • Status: {editingOrder.status}
+                  </p>
+                )}
               </div>
               <button
                 type="button"
@@ -536,17 +631,17 @@ export default function CashierOrdersPage() {
               ) : (
                 draftDisplayItems.map((item) => (
                   <div
-                    key={item.productId}
+                    key={`${item.productId}:${item.chickenCut || "default"}`}
                     className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4"
                   >
                     <div>
-                      <p className="font-semibold text-slate-900">{item.product.name}</p>
+                      <p className="font-semibold text-slate-900">{item.label}</p>
                       <p className="text-sm text-slate-500">{formatCurrency(item.lineTotal)}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => updateDraftQuantity(item.productId, -1)}
+                        onClick={() => updateDraftQuantity(item.productId, -1, item.chickenCut || undefined)}
                         className="h-8 w-8 rounded-xl border border-slate-200 text-slate-700"
                       >
                         -
@@ -556,7 +651,7 @@ export default function CashierOrdersPage() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => updateDraftQuantity(item.productId, 1)}
+                        onClick={() => updateDraftQuantity(item.productId, 1, item.chickenCut || undefined)}
                         className="h-8 w-8 rounded-xl border border-slate-200 text-slate-700"
                       >
                         +
@@ -572,13 +667,72 @@ export default function CashierOrdersPage() {
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-300">Total draft</p>
                 <p className="mt-1 text-xl font-bold">{formatCurrency(draftSubtotal)}</p>
               </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {editingOrderId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelFromModal}
+                    disabled={isSubmittingOrder || editingOrder?.status !== "pending"}
+                    className="rounded-2xl border border-rose-300 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Batalkan pesanan
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={submitOrderForm}
+                  disabled={isSubmittingOrder}
+                  className="rounded-2xl bg-orange-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSubmittingOrder ? "Menyimpan..." : editingOrderId ? "Simpan perubahan" : "Simpan pesanan"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingChickenItem && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          onClick={() => setPendingChickenItem(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-orange-600">
+                  Pilih potongan ayam
+                </p>
+                <h3 className="mt-1 text-xl font-bold text-slate-950">{pendingChickenItem.productName}</h3>
+                <p className="mt-2 text-sm text-slate-500">Pilih Dada atau Paha sebelum item ditambahkan.</p>
+              </div>
               <button
                 type="button"
-                onClick={submitOrderForm}
-                disabled={isSubmittingOrder}
-                className="rounded-2xl bg-orange-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={() => setPendingChickenItem(null)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:border-orange-300 hover:text-orange-600"
+                aria-label="Tutup modal pilihan ayam"
               >
-                {isSubmittingOrder ? "Menyimpan..." : editingOrderId ? "Simpan perubahan" : "Simpan pesanan"}
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handleChooseChickenCut("dada")}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-700"
+              >
+                Dada
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChooseChickenCut("paha")}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-700"
+              >
+                Paha
               </button>
             </div>
           </div>

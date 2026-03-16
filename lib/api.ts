@@ -150,6 +150,8 @@ function normalizeOrder(order: Order) {
     totalAmount: Number(order.totalAmount),
     items: toArray(order.items).map((item) => ({
       ...item,
+      chickenCut:
+        item.chickenCut === "dada" || item.chickenCut === "paha" ? item.chickenCut : null,
       price: Number(item.price),
       lineTotal: Number(item.lineTotal),
     })),
@@ -177,7 +179,7 @@ export async function createOrder(payload: {
   customerPhone?: string;
   notes?: string;
   paymentMethod: "cash" | "qris" | "transfer";
-  items: Array<{ productId: number; quantity: number }>;
+  items: Array<{ productId: number; quantity: number; chickenCut?: "dada" | "paha" }>;
 }) {
   const response = await api.post<{ success: boolean; message: string; data: Order }>(
     "/orders",
@@ -296,7 +298,7 @@ export async function deleteMenuItem(id: number, token?: string) {
 export async function updateCashierOrder(
   id: number,
   payload: Partial<Pick<Order, "status" | "paymentStatus" | "customerName" | "notes" | "paymentMethod">> & {
-    items?: Array<{ productId: number; quantity: number }>;
+    items?: Array<{ productId: number; quantity: number; chickenCut?: "dada" | "paha" }>;
   },
   token?: string
 ) {

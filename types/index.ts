@@ -32,6 +32,7 @@ export type OrderItem = {
   id: number;
   productId: number;
   productName: string;
+  chickenCut?: "dada" | "paha" | null;
   quantity: number;
   price: number;
   lineTotal: number;
