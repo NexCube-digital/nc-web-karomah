@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { ArrowLeft, ShoppingCart, X } from "lucide-react";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
+import { CrudToast } from "@/components/CrudToast";
 import { createOrder, fetchManagedCategories, fetchManagedProducts } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { Category, Order, Product } from "@/types";
@@ -56,6 +57,19 @@ export default function CashierCreateOrderPage() {
 
     bootstrap();
   }, [refreshData]);
+
+  useEffect(() => {
+    if (!feedback && !errorMessage) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setFeedback(null);
+      setErrorMessage(null);
+    }, 4500);
+
+    return () => window.clearTimeout(timeout);
+  }, [feedback, errorMessage]);
 
   const categoryTabs = useMemo(() => {
     const categoriesFromProducts = Array.from(new Set(products.map((item) => item.category)));
@@ -141,6 +155,7 @@ export default function CashierCreateOrderPage() {
         items: cartItems.map((item) => ({
           productId: item.id,
           quantity: item.quantity,
+          chickenCut: item.chickenCut,
         })),
       });
 
@@ -164,17 +179,14 @@ export default function CashierCreateOrderPage() {
 
   return (
     <section className="space-y-4">
-      {(feedback || errorMessage) && (
-        <div
-          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
-            errorMessage
-              ? "border-rose-200 bg-rose-50 text-rose-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          {errorMessage || feedback}
-        </div>
-      )}
+      <CrudToast
+        message={errorMessage || feedback}
+        isError={Boolean(errorMessage)}
+        onClose={() => {
+          setFeedback(null);
+          setErrorMessage(null);
+        }}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white p-4">
         <div className="flex items-center gap-2">

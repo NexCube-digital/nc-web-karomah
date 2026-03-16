@@ -404,6 +404,7 @@ export default function CashierMenuPage() {
         items: cartItems.map((item) => ({
           productId: item.id,
           quantity: item.quantity,
+          chickenCut: item.chickenCut,
         })),
       });
 
