@@ -15,6 +15,11 @@ function getSafeImageUrl(imageUrl: string | null | undefined) {
     return DEFAULT_PRODUCT_IMAGE;
   }
 
+  // Handle API-served images (from uploads folder)
+  if (normalizedValue.startsWith("/uploads/")) {
+    return `http://localhost:4000${normalizedValue}`;
+  }
+
   return normalizedValue;
 }
 

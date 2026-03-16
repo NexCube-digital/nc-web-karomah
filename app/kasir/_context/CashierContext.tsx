@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import { CartItem, CashierUser, Product } from "@/types";
+import { AddCartItemOptions, CartItem, CashierUser, Product } from "@/types";
 
 type CashierContextValue = {
   token: string;
@@ -11,8 +11,8 @@ type CashierContextValue = {
   connectPrinter: () => Promise<void>;
   logout: () => void;
   cartItems: CartItem[];
-  addCartItem: (product: Product) => void;
-  updateCartItemQuantity: (productId: number, delta: number) => void;
+  addCartItem: (product: Product, options?: AddCartItemOptions) => void;
+  updateCartItemQuantity: (cartKey: string, delta: number) => void;
   clearCartItems: () => void;
 };
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { ArrowLeft, ShoppingCart } from "lucide-react";
+import { ArrowLeft, ShoppingCart, X } from "lucide-react";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { createOrder, fetchManagedCategories, fetchManagedProducts } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
@@ -32,6 +32,7 @@ export default function CashierCreateOrderPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [selectedChickenProduct, setSelectedChickenProduct] = useState<Product | null>(null);
 
   const refreshData = useCallback(async () => {
     const [managedProducts, managedCategories] = await Promise.all([
@@ -89,6 +90,33 @@ export default function CashierCreateOrderPage() {
     () => cartItems.reduce((total, item) => total + item.price * item.quantity, 0),
     [cartItems]
   );
+
+  const isChickenCategory = useCallback((product: Product) => {
+    return product.category.trim().toLowerCase() === "ayam goreng";
+  }, []);
+
+  function handleAddProduct(product: Product) {
+    if (isChickenCategory(product)) {
+      setSelectedChickenProduct(product);
+      return;
+    }
+
+    addCartItem(product);
+  }
+
+  function handleChooseChickenCut(cut: "dada" | "paha") {
+    if (!selectedChickenProduct) {
+      return;
+    }
+
+    const label = cut === "dada" ? "Dada" : "Paha";
+    addCartItem(selectedChickenProduct, {
+      variantKey: cut,
+      displayNameSuffix: label,
+      chickenCut: cut,
+    });
+    setSelectedChickenProduct(null);
+  }
 
   async function handleSubmitOrder() {
     if (!customerName.trim()) {
@@ -206,7 +234,7 @@ export default function CashierCreateOrderPage() {
                 <button
                   key={product.id}
                   type="button"
-                  onClick={() => addCartItem(product)}
+                  onClick={() => handleAddProduct(product)}
                   className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-orange-300 hover:shadow-md"
                 >
                   <ProductThumbnail
@@ -245,7 +273,7 @@ export default function CashierCreateOrderPage() {
                 </div>
               ) : (
                 cartItems.map((item) => (
-                  <div key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <div key={item.cartKey} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">{item.name}</p>
@@ -254,7 +282,7 @@ export default function CashierCreateOrderPage() {
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => updateCartItemQuantity(item.id, -1)}
+                          onClick={() => updateCartItemQuantity(item.cartKey, -1)}
                           className="h-7 w-7 rounded-lg border border-slate-200 bg-white text-sm font-bold text-slate-700"
                         >
                           -
@@ -264,7 +292,7 @@ export default function CashierCreateOrderPage() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => updateCartItemQuantity(item.id, 1)}
+                          onClick={() => updateCartItemQuantity(item.cartKey, 1)}
                           className="h-7 w-7 rounded-lg border border-slate-200 bg-white text-sm font-bold text-slate-700"
                         >
                           +
@@ -322,6 +350,53 @@ export default function CashierCreateOrderPage() {
           </div>
         </aside>
       </div>
+
+      {selectedChickenProduct && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          onClick={() => setSelectedChickenProduct(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-orange-600">
+                  Pilih potongan ayam
+                </p>
+                <h3 className="mt-1 text-xl font-bold text-slate-950">{selectedChickenProduct.name}</h3>
+                <p className="mt-2 text-sm text-slate-500">Pilih bagian sebelum dimasukkan ke keranjang.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedChickenProduct(null)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:border-orange-300 hover:text-orange-600"
+                aria-label="Tutup modal pilihan ayam"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handleChooseChickenCut("dada")}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-700"
+              >
+                Dada
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChooseChickenCut("paha")}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-700"
+              >
+                Paha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

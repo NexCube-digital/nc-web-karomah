@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ChevronsLeft,
+  ChevronsRight,
   ChevronDown,
   CircleUserRound,
   Layers3,
@@ -19,7 +21,7 @@ import {
 import { clearAuthSession, getPrinterReady, setPrinterReady } from "@/lib/auth";
 import { useCashierSession } from "@/app/kasir/_hooks/useCashierSession";
 import { CashierContextProvider } from "@/app/kasir/_context/CashierContext";
-import { CartItem, Product } from "@/types";
+import { AddCartItemOptions, CartItem, Product } from "@/types";
 import { Fragment, useEffect, useRef, useState } from "react";
 
 const navItems = [
@@ -92,6 +94,7 @@ export default function ProtectedCashierLayout({
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isQueueMenuOpen, setIsQueueMenuOpen] = useState(false);
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const isQueueMenuExpanded = pathname.startsWith("/kasir/orders") || isQueueMenuOpen;
 
@@ -120,25 +123,38 @@ export default function ProtectedCashierLayout({
     router.replace("/kasir/login");
   }
 
-  function addCartItem(product: Product) {
+  function addCartItem(product: Product, options?: AddCartItemOptions) {
+    const variantKey = options?.variantKey?.trim() || "default";
+    const cartKey = `${product.id}:${variantKey}`;
+    const displayNameSuffix = options?.displayNameSuffix?.trim();
+
     setCartItems((currentCart) => {
-      const existingItem = currentCart.find((item) => item.id === product.id);
+      const existingItem = currentCart.find((item) => item.cartKey === cartKey);
 
       if (existingItem) {
         return currentCart.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+          item.cartKey === cartKey ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
 
-      return [...currentCart, { ...product, quantity: 1 }];
+      return [
+        ...currentCart,
+        {
+          ...product,
+          cartKey,
+          chickenCut: options?.chickenCut,
+          name: displayNameSuffix ? `${product.name} - ${displayNameSuffix}` : product.name,
+          quantity: 1,
+        },
+      ];
     });
   }
 
-  function updateCartItemQuantity(productId: number, delta: number) {
+  function updateCartItemQuantity(cartKey: string, delta: number) {
     setCartItems((currentCart) =>
       currentCart
         .map((item) =>
-          item.id === productId ? { ...item, quantity: item.quantity + delta } : item
+          item.cartKey === cartKey ? { ...item, quantity: item.quantity + delta } : item
         )
         .filter((item) => item.quantity > 0)
     );
@@ -201,25 +217,85 @@ export default function ProtectedCashierLayout({
     >
       <main className="min-h-screen bg-slate-100 text-slate-900">
         <div className="flex min-h-screen">
-          <aside className="sticky top-0 hidden h-screen w-72 shrink-0 flex-col border-r border-slate-800 bg-slate-950 text-white xl:flex">
-            <div className="border-b border-white/10 px-6 py-6">
-              <div className="flex items-center gap-3">
+          <aside
+            className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-slate-800 bg-slate-950 text-white transition-all duration-300 xl:flex ${
+              isSidebarMinimized ? "w-24" : "w-72"
+            }`}
+          >
+            <div
+              className={`border-b border-white/10 transition-all duration-300 ${
+                isSidebarMinimized ? "px-3 py-4" : "px-6 py-6"
+              }`}
+            >
+              <div className={`flex items-center gap-3 ${isSidebarMinimized ? "justify-center" : "justify-between"}`}>
+                <div className="flex items-center gap-3">
                 <Image src="/image/logo.svg" alt="Karomah Food" width={44} height={44} className="h-11 w-11" />
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-300">
-                    Admin Panel
-                  </p>
-                  <h1 className="mt-1 text-2xl font-black text-white">Dashboard Kasir</h1>
+                  {!isSidebarMinimized && (
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-orange-300">
+                        Admin Panel
+                      </p>
+                      <h1 className="mt-1 text-2xl font-black text-white">Dashboard Kasir</h1>
+                    </div>
+                  )}
                 </div>
+
+                {!isSidebarMinimized && (
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarMinimized(true)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:border-orange-300 hover:text-orange-300"
+                    aria-label="Minimize sidebar"
+                    title="Minimize sidebar"
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </button>
+                )}
               </div>
+
+              {isSidebarMinimized && (
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarMinimized(false)}
+                  className="mt-3 inline-flex h-9 w-full items-center justify-center rounded-xl border border-white/10 text-slate-300 transition hover:border-orange-300 hover:text-orange-300"
+                  aria-label="Perluas sidebar"
+                  title="Perluas sidebar"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
-            <nav className="flex-1 space-y-2 px-4 py-5">
+            <nav
+              className={`flex-1 space-y-2 transition-all duration-300 ${
+                isSidebarMinimized ? "px-2 py-4" : "px-4 py-5"
+              }`}
+            >
               {navItems.map((item) => {
                 const Icon = item.icon;
 
                 if ("children" in item) {
                   const parentActive = item.children.some((child) => pathname === child.href);
+
+                  if (isSidebarMinimized) {
+                    const activeChild = item.children.find((child) => pathname === child.href) || item.children[0];
+
+                    return (
+                      <Link
+                        key={item.label}
+                        href={activeChild.href}
+                        className={`flex items-center justify-center rounded-2xl px-2 py-3 text-sm font-semibold transition ${
+                          parentActive
+                            ? "bg-orange-400 text-slate-950"
+                            : "text-slate-200 hover:bg-white/8 hover:text-white"
+                        }`}
+                        aria-label={item.label}
+                        title={item.label}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </Link>
+                    );
+                  }
 
                   return (
                     <div key={item.label} className="space-y-2">
@@ -274,14 +350,18 @@ export default function ProtectedCashierLayout({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                    className={`flex items-center rounded-2xl py-3 text-sm font-semibold transition ${
+                      isSidebarMinimized ? "justify-center px-2" : "gap-3 px-4"
+                    } ${
                       active
                         ? "bg-orange-400 text-slate-950"
                         : "text-slate-200 hover:bg-white/8 hover:text-white"
                     }`}
+                    aria-label={item.label}
+                    title={item.label}
                   >
                     <Icon className="h-4 w-4" />
-                    {item.label}
+                    {!isSidebarMinimized && item.label}
                   </Link>
                 );
               })}

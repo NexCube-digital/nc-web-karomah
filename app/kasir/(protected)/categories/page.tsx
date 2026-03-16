@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import axios from "axios";
-import { Pencil, Trash2 } from "lucide-react";
+import { ImagePlus, Pencil, Trash2, X } from "lucide-react";
+import { CrudToast } from "@/components/CrudToast";
 import {
   createCategory,
   deleteCategory,
@@ -12,17 +14,27 @@ import {
 import { Category, CategoryPayload } from "@/types";
 import { useCashierContext } from "@/app/kasir/_context/CashierContext";
 
-const emptyForm: CategoryPayload = {
+type CategoryFormState = CategoryPayload & {
+  existingImageUrl: string;
+};
+
+const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/svg+xml"]);
+
+const emptyForm: CategoryFormState = {
   name: "",
   imageUrl: "",
+  imageFile: null,
+  removeImage: false,
+  existingImageUrl: "",
   isActive: true,
 };
 
 export default function CashierCategoriesPage() {
   const { token } = useCashierContext();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [form, setForm] = useState<CategoryPayload>(emptyForm);
+  const [form, setForm] = useState<CategoryFormState>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -101,7 +113,7 @@ export default function CashierCategoriesPage() {
         setFeedback(`Kategori ${form.name} berhasil ditambahkan.`);
       }
 
-      setForm(emptyForm);
+      resetForm();
       setEditingId(null);
       setIsModalOpen(false);
       await refreshCategories();
@@ -117,11 +129,77 @@ export default function CashierCategoriesPage() {
     }
   }
 
+  function resetForm() {
+    setForm((current) => {
+      if (current.imageUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(current.imageUrl);
+      }
+      return emptyForm;
+    });
+  }
+
+  function handleSelectedFile(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    if (!acceptedImageTypes.has(file.type)) {
+      setErrorMessage("Foto kategori harus berformat JPG, JPEG, PNG, atau SVG.");
+      return;
+    }
+
+    setErrorMessage(null);
+    setForm((current) => {
+      if (current.imageUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(current.imageUrl);
+      }
+
+      return {
+        ...current,
+        imageFile: file,
+        imageUrl: URL.createObjectURL(file),
+        removeImage: false,
+      };
+    });
+  }
+
+  function handleFileInputChange(event: ChangeEvent<HTMLInputElement>) {
+    handleSelectedFile(event.target.files?.[0] || null);
+    event.target.value = "";
+  }
+
+  function handleRemoveImage() {
+    setForm((current) => {
+      if (current.imageUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(current.imageUrl);
+      }
+
+      return {
+        ...current,
+        imageUrl: "",
+        imageFile: null,
+        existingImageUrl: "",
+        removeImage: true,
+      };
+    });
+  }
+
+  useEffect(() => {
+    return () => {
+      if (form.imageUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(form.imageUrl);
+      }
+    };
+  }, [form.imageUrl]);
+
   function handleEditCategory(category: Category) {
     setEditingId(category.id);
     setForm({
       name: category.name,
       imageUrl: category.imageUrl,
+      imageFile: null,
+      removeImage: false,
+      existingImageUrl: category.imageUrl,
       isActive: category.isActive,
     });
     setIsModalOpen(true);
@@ -162,31 +240,14 @@ export default function CashierCategoriesPage() {
 
   return (
     <div className="space-y-6">
-      {(feedback || errorMessage) && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
-            errorMessage
-              ? "border-rose-200 bg-rose-50 text-rose-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <span>{errorMessage || feedback}</span>
-            <button
-              type="button"
-              onClick={() => {
-                setFeedback(null);
-                setErrorMessage(null);
-              }}
-              className="rounded-lg px-2 py-1 text-xs font-semibold opacity-80 transition hover:opacity-100"
-            >
-              Tutup
-            </button>
-          </div>
-        </div>
-      )}
+      <CrudToast
+        message={errorMessage || feedback}
+        isError={Boolean(errorMessage)}
+        onClose={() => {
+          setFeedback(null);
+          setErrorMessage(null);
+        }}
+      />
 
       <section className="rounded-4xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -255,7 +316,11 @@ export default function CashierCategoriesPage() {
                     <div className="flex items-center gap-4">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={category.imageUrl || "/image/default.png"}
+                        src={
+                          category.imageUrl?.startsWith("/uploads/")
+                            ? `http://localhost:4000${category.imageUrl}`
+                            : category.imageUrl || "/image/default.png"
+                        }
                         alt={category.name}
                         className="h-16 w-16 rounded-2xl object-cover ring-2 ring-slate-100"
                         onError={(event) => {
@@ -341,15 +406,69 @@ export default function CashierCategoriesPage() {
                 />
               </label>
 
-              <label className="space-y-2">
-                <span className="text-sm font-semibold text-slate-700">URL foto kategori</span>
+              <div className="space-y-2">
+                <span className="text-sm font-semibold text-slate-700">Foto kategori</span>
+                {form.imageUrl && !form.removeImage && (
+                  <div className="relative inline-block">
+                    {form.imageUrl.startsWith("blob:") ? (
+                      // Blob URL (preview before upload)
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={form.imageUrl}
+                        alt={form.name}
+                        className="h-32 w-32 rounded-2xl border border-slate-200 object-cover"
+                      />
+                    ) : form.imageUrl.startsWith("/uploads/") ? (
+                      // Uploaded image from server
+                      <Image
+                        src={`http://localhost:4000${form.imageUrl}`}
+                        alt={form.name}
+                        width={128}
+                        height={128}
+                        className="h-32 w-32 rounded-2xl border border-slate-200 object-cover"
+                      />
+                    ) : (
+                      // External URL
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={form.imageUrl}
+                        alt={form.name}
+                        className="h-32 w-32 rounded-2xl border border-slate-200 object-cover"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute -right-2 -top-2 rounded-full bg-rose-500 p-1 text-white transition hover:bg-rose-600"
+                      aria-label="Hapus foto"
+                      title="Hapus foto"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+
+                {!form.imageUrl || form.removeImage ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 px-4 py-6 text-slate-500 transition hover:border-orange-300 hover:bg-orange-50"
+                  >
+                    <ImagePlus className="h-6 w-6" />
+                    <span className="text-sm font-medium">Pilih foto kategori</span>
+                    <span className="text-xs">JPG, JPEG, PNG, atau SVG</span>
+                  </button>
+                ) : null}
+
                 <input
-                  value={form.imageUrl}
-                  onChange={(event) => setForm((current) => ({ ...current, imageUrl: event.target.value }))}
-                  placeholder="https://..."
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-orange-300"
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.svg"
+                  onChange={handleFileInputChange}
+                  className="hidden"
+                  aria-label="Upload foto kategori"
                 />
-              </label>
+              </div>
             </div>
 
             <label className="mt-5 inline-flex items-center gap-3 text-sm text-slate-600">
@@ -371,7 +490,7 @@ export default function CashierCategoriesPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setForm(emptyForm);
+                  resetForm();
                   setEditingId(null);
                 }}
                 className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-600"

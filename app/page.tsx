@@ -1,6 +1,6 @@
  "use client";
 
- import { useEffect, useMemo, useState } from "react";
+ import { useEffect, useMemo, useRef, useState } from "react";
  import Image from "next/image";
  import Link from "next/link";
  import { Search, ShoppingCart, X } from "lucide-react";
@@ -14,9 +14,12 @@ import { ProductThumbnail } from "@/components/ProductThumbnail";
    return `kategori-${category.toLowerCase().replace(/\s+/g, "-")}`;
  }
 
-function getMockRating(productId: number) {
-  const rating = 4.6 + (productId % 5) * 0.1;
-  return Math.min(rating, 5).toFixed(1);
+function formatProductRating(rating: number | null | undefined) {
+  if (typeof rating !== "number" || Number.isNaN(rating) || rating <= 0) {
+    return "Baru";
+  }
+
+  return rating.toFixed(1);
 }
 
  export default function Home() {
@@ -31,6 +34,17 @@ function getMockRating(productId: number) {
    const [isLoadingMenu, setIsLoadingMenu] = useState(true);
    const [feedback, setFeedback] = useState<string | null>(null);
    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+   const [isCartPulse, setIsCartPulse] = useState(false);
+   const cartButtonRef = useRef<HTMLButtonElement | null>(null);
+   const cartPulseTimeoutRef = useRef<number | null>(null);
+
+   useEffect(() => {
+     return () => {
+       if (cartPulseTimeoutRef.current) {
+         window.clearTimeout(cartPulseTimeoutRef.current);
+       }
+     };
+   }, []);
 
    useEffect(() => {
      if (!feedback && !errorMessage) {
@@ -113,7 +127,63 @@ function getMockRating(productId: number) {
      [cart]
    );
 
-   function addToCart(product: Product) {
+   function playAddToCartAnimation(sourceElement: HTMLElement) {
+     const cartButton = cartButtonRef.current;
+
+     if (!cartButton) {
+       return;
+     }
+
+     const sourceRect = sourceElement.getBoundingClientRect();
+     const cartRect = cartButton.getBoundingClientRect();
+     const startX = sourceRect.left + sourceRect.width / 2;
+     const startY = sourceRect.top + sourceRect.height / 2;
+     const endX = cartRect.left + cartRect.width / 2;
+     const endY = cartRect.top + cartRect.height / 2;
+     const deltaX = endX - startX;
+     const deltaY = endY - startY;
+
+     const dot = document.createElement("div");
+     dot.setAttribute("aria-hidden", "true");
+     dot.style.position = "fixed";
+     dot.style.left = `${startX}px`;
+     dot.style.top = `${startY}px`;
+     dot.style.width = "12px";
+     dot.style.height = "12px";
+     dot.style.borderRadius = "9999px";
+     dot.style.background = "linear-gradient(135deg, #d88a58 0%, #a84f24 100%)";
+     dot.style.boxShadow = "0 8px 18px rgba(168, 79, 36, 0.35)";
+     dot.style.pointerEvents = "none";
+     dot.style.opacity = "0.95";
+     dot.style.transform = "translate(-50%, -50%) scale(1)";
+     dot.style.transition = "transform 580ms cubic-bezier(0.22, 1, 0.36, 1), opacity 580ms ease";
+     dot.style.zIndex = "90";
+
+     document.body.appendChild(dot);
+
+     window.requestAnimationFrame(() => {
+       dot.style.transform = `translate(calc(-50% + ${deltaX}px), calc(-50% + ${deltaY}px)) scale(0.25)`;
+       dot.style.opacity = "0.15";
+     });
+
+     window.setTimeout(() => {
+       dot.remove();
+     }, 620);
+
+     setIsCartPulse(true);
+     if (cartPulseTimeoutRef.current) {
+       window.clearTimeout(cartPulseTimeoutRef.current);
+     }
+     cartPulseTimeoutRef.current = window.setTimeout(() => {
+       setIsCartPulse(false);
+     }, 240);
+   }
+
+   function addToCart(product: Product, sourceElement?: HTMLElement) {
+     if (sourceElement) {
+       playAddToCartAnimation(sourceElement);
+     }
+
      setCart((currentCart) => {
        const existingItem = currentCart.find((item) => item.id === product.id);
 
@@ -183,8 +253,13 @@ function getMockRating(productId: number) {
    }
 
    return (
-     <main className="min-h-screen bg-[radial-gradient(circle_at_top,#fff7ed,#f8fafc_45%,#e2e8f0)] text-slate-900">
-       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+     <main className="relative min-h-screen overflow-x-clip text-[#2b221a]">
+       <div className="pointer-events-none absolute inset-0 -z-10">
+         <div className="absolute -top-40 left-1/2 h-112 w-md -translate-x-1/2 rounded-full bg-[#f2c9a8]/40 blur-3xl" />
+         <div className="absolute -right-28 top-56 h-80 w-80 rounded-full bg-[#8c9d6b]/20 blur-3xl" />
+       </div>
+
+       <header className="sticky top-0 z-40 border-b border-[#eadcc8] bg-[#fffaf0]/90 backdrop-blur-lg">
          <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
            <div className="flex shrink-0 items-center gap-2">
              <Image
@@ -195,9 +270,9 @@ function getMockRating(productId: number) {
                className="h-8 w-auto"
                priority
              />
-             <div className="leading-tight text-slate-900">
+             <div className="leading-tight text-[#2b221a]">
                <p className="text-xs font-black tracking-[0.18em]">KAROMAH</p>
-               <p className="text-xs font-bold tracking-[0.24em] text-orange-600">FOOD</p>
+               <p className="text-xs font-bold tracking-[0.24em] text-[#a84f24]">FOOD</p>
              </div>
            </div>
 
@@ -208,7 +283,7 @@ function getMockRating(productId: number) {
                  const target = document.getElementById("menu-list");
                  target?.scrollIntoView({ behavior: "smooth", block: "start" });
                }}
-               className="shrink-0 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-500"
+               className="shrink-0 rounded-full bg-[#2f251d] px-4 py-2 text-sm font-semibold text-[#fffaf0] transition hover:bg-[#a84f24]"
              >
                Home
              </button>
@@ -217,7 +292,7 @@ function getMockRating(productId: number) {
           <Link
             href="/search"
             aria-label="Cari menu"
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:border-orange-300 hover:text-orange-600"
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#e2d4bf] bg-[#fffaf2] text-[#5f564d] transition hover:border-[#d5956e] hover:text-[#a84f24]"
           >
             <Search className="h-4 w-4" />
           </Link>
@@ -225,12 +300,15 @@ function getMockRating(productId: number) {
           <button
             type="button"
             onClick={() => setIsCartOpen(true)}
-            className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:border-orange-300 hover:text-orange-600"
+            ref={cartButtonRef}
+            className={`relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#e2d4bf] bg-[#fffaf2] text-[#5f564d] transition-all duration-300 hover:border-[#d5956e] hover:text-[#a84f24] ${
+              isCartPulse ? "scale-110 border-[#d5956e] text-[#a84f24]" : ""
+            }`}
             aria-label="Buka keranjang"
           >
             <ShoppingCart className="h-4 w-4" />
             {totalItems > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-bold text-white">
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#c96d3a] px-1 text-[10px] font-bold text-white">
                 {totalItems}
               </span>
             )}
@@ -238,7 +316,7 @@ function getMockRating(productId: number) {
 
            <Link
              href="/kasir/login"
-             className="inline-flex shrink-0 rounded-2xl bg-orange-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-orange-300"
+             className="inline-flex shrink-0 rounded-2xl bg-[#d88a58] px-4 py-2 text-sm font-semibold text-[#2f251d] transition hover:bg-[#c96d3a] hover:text-[#fffaf0]"
            >
              Log in
            </Link>
@@ -246,6 +324,26 @@ function getMockRating(productId: number) {
        </header>
 
        <section className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+        <section className="relative overflow-hidden rounded-[2.2rem] border border-[#eadbc4] bg-linear-to-br from-[#fff9ef] via-[#fff3e2] to-[#f4e6d2] p-7 shadow-[0_24px_80px_-48px_rgba(108,62,33,0.5)] sm:p-10">
+          <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#e8b48d]/45 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 -left-28 h-72 w-72 rounded-full bg-[#8c9d6b]/18 blur-3xl" />
+          <div className="relative z-10 max-w-3xl">
+            <p className="inline-flex rounded-full border border-[#e4ccb2] bg-[#fff7eb] px-4 py-1 text-xs font-bold tracking-[0.2em] text-[#9a5b33]">
+              MENU HARI INI
+            </p>
+            <h1 className="font-display mt-5 text-4xl leading-tight text-[#2f251d] sm:text-5xl lg:text-6xl">
+              Kuliner UMKM yang Hangat, Cepat Dipesan, Mudah Dinikmati.
+            </h1>
+            <p className="mt-5 max-w-2xl text-base leading-7 text-[#5f564d] sm:text-lg">
+              Pilih menu favoritmu, atur pesanan dalam hitungan detik, dan nikmati cita rasa rumahan Karomah Food dengan pengalaman digital yang lebih nyaman.
+            </p>
+            <div className="mt-7 flex flex-wrap items-center gap-3 text-sm">
+              <span className="rounded-full border border-[#dbcab2] bg-[#fffaf2] px-4 py-2 font-semibold text-[#5f564d]">Pesan tanpa antre</span>
+              <span className="rounded-full border border-[#dbcab2] bg-[#fffaf2] px-4 py-2 font-semibold text-[#5f564d]">Kategori rapi</span>
+              <span className="rounded-full border border-[#dbcab2] bg-[#fffaf2] px-4 py-2 font-semibold text-[#5f564d]">Checkout praktis</span>
+            </div>
+          </div>
+        </section>
 
          {(feedback || errorMessage) && (
            <div
@@ -274,8 +372,8 @@ function getMockRating(productId: number) {
          )}
 
          {!isLoadingMenu && categoryItems.length > 0 && (
-           <section className="rounded-4xl border border-slate-200 bg-white/90 p-6 shadow-sm">
-             <h2 className="text-center text-3xl font-black tracking-tight text-slate-950">
+           <section className="rounded-4xl border border-[#eadcc8] bg-[#fffaf2]/95 p-6 shadow-[0_16px_50px_-34px_rgba(78,50,31,0.55)] sm:p-8">
+             <h2 className="font-display text-center text-3xl font-semibold tracking-tight text-[#2f251d]">
                Pilih kategori favorit
              </h2>
              <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
@@ -287,15 +385,19 @@ function getMockRating(productId: number) {
                      const target = document.getElementById(toCategoryId(category.name));
                      target?.scrollIntoView({ behavior: "smooth", block: "start" });
                    }}
-                   className="group flex flex-col items-center rounded-3xl border border-slate-100 p-4 text-center transition hover:bg-slate-50"
+                   className="group flex flex-col items-center rounded-3xl border border-[#efe2d0] bg-[#fffdf8] p-4 text-center transition hover:-translate-y-0.5 hover:border-[#d7b089] hover:bg-[#fff5e9]"
                  >
                    {/* eslint-disable-next-line @next/next/no-img-element */}
                    <img
-                     src={category.imageUrl}
+                     src={
+                       category.imageUrl?.startsWith("/uploads/")
+                         ? `http://localhost:4000${category.imageUrl}`
+                         : category.imageUrl
+                     }
                      alt={category.name}
-                     className="h-28 w-28 rounded-full object-cover ring-4 ring-emerald-200 transition group-hover:ring-orange-200"
+                     className="h-28 w-28 rounded-full object-cover ring-4 ring-[#d9e3cd] transition group-hover:ring-[#e8c3a0]"
                    />
-                   <p className="mt-4 text-lg font-semibold text-slate-900">{category.name}</p>
+                   <p className="mt-4 text-lg font-semibold text-[#352920]">{category.name}</p>
                  </button>
                ))}
              </div>
@@ -304,13 +406,13 @@ function getMockRating(productId: number) {
 
          <section id="menu-list" className="space-y-6 scroll-mt-28">
              {isLoadingMenu && (
-               <div className="rounded-3xl border border-slate-200 bg-white p-5 text-sm text-slate-500">
+               <div className="rounded-3xl border border-[#e7d7c0] bg-[#fffaf2] p-5 text-sm text-[#6f645a]">
                  Memuat menu...
                </div>
              )}
 
               {!isLoadingMenu && products.length === 0 && (
-                <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">
+                <div className="rounded-3xl border border-dashed border-[#d9c7ad] bg-[#fffaf2] p-5 text-sm text-[#6f645a]">
                   Menu belum tersedia. Silakan input menu dari dashboard kasir.
                 </div>
               )}
@@ -318,8 +420,8 @@ function getMockRating(productId: number) {
              {Object.entries(groupedProducts).map(([category, items]) => (
                <div key={category} id={toCategoryId(category)} className="space-y-4 scroll-mt-28">
                  <div className="flex items-center justify-between">
-                   <h2 className="text-2xl font-bold text-slate-950">{category}</h2>
-                   <span className="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-600">
+                   <h2 className="font-display text-3xl font-semibold text-[#2f251d]">{category}</h2>
+                   <span className="rounded-full border border-[#e3d5c2] bg-[#fff8ee] px-3 py-1 text-sm text-[#6f645a]">
                      {items.length} menu
                    </span>
                  </div>
@@ -328,16 +430,16 @@ function getMockRating(productId: number) {
                    {items.map((product) => (
                      <article
                        key={product.id}
-                       className="h-full overflow-hidden rounded-[28px] border border-slate-200 bg-white p-2.5 shadow-sm transition hover:shadow-md"
+                       className="h-full overflow-hidden rounded-[28px] border border-[#eadbc6] bg-[#fffefb] p-2.5 shadow-[0_16px_45px_-32px_rgba(86,57,34,0.7)] transition hover:-translate-y-0.5 hover:border-[#deb48c] hover:shadow-[0_22px_50px_-30px_rgba(86,57,34,0.55)]"
                      >
                        <div className="flex h-full items-stretch gap-4 md:flex-col md:gap-0">
                          <ProductThumbnail
                            src={product.imageUrl}
                            alt={product.name}
-                            className="relative h-32 w-32 shrink-0 overflow-hidden rounded-3xl bg-slate-100 md:h-28 md:w-full md:rounded-2xl xl:h-32"
+                            className="relative h-32 w-32 shrink-0 overflow-hidden rounded-3xl bg-[#f4e8d8] md:h-28 md:w-full md:rounded-2xl xl:h-32"
                            overlay={
-                             <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-3 py-1 text-xs font-bold text-slate-900 shadow-sm">
-                               ★ {getMockRating(product.id)}
+                             <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-[#fff9ef]/95 px-3 py-1 text-xs font-bold text-[#2f251d] shadow-sm">
+                               {typeof product.rating === "number" && product.rating > 0 ? "★" : "☆"} {formatProductRating(product.rating)}
                              </div>
                            }
                          />
@@ -345,24 +447,24 @@ function getMockRating(productId: number) {
                            <div>
                              <div className="flex items-start justify-between gap-3">
                                <div className="min-w-0">
-                                 <h3 className="line-clamp-2 text-lg font-bold leading-tight text-slate-950 md:text-xl">
+                                 <h3 className="line-clamp-2 text-lg font-bold leading-tight text-[#2f251d] md:text-xl">
                                    {product.name}
                                  </h3>
-                                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600 md:mt-1 md:min-h-10 md:line-clamp-2 md:text-[13px] md:leading-5">
+                                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-[#6a5d51] md:mt-1 md:min-h-10 md:line-clamp-2 md:text-[13px] md:leading-5">
                                    {product.description || "Menu andalan siap dipesan."}
                                  </p>
                                </div>
                              </div>
-                             <p className="mt-2 text-sm font-medium text-slate-500 md:text-xs">{product.category}</p>
+                             <p className="mt-2 text-sm font-medium text-[#827666] md:text-xs">{product.category}</p>
                            </div>
                            <div className="mt-3 flex items-center justify-between gap-3 md:mt-0 md:gap-2">
-                             <p className="text-base font-bold text-slate-950 md:text-sm xl:text-base">
+                             <p className="text-base font-bold text-[#31271f] md:text-sm xl:text-base">
                                {formatCurrency(product.price)}
                              </p>
                              <button
                                type="button"
-                               onClick={() => addToCart(product)}
-                               className="rounded-2xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-500 md:px-3 md:py-1.5 md:text-xs"
+                               onClick={(event) => addToCart(product, event.currentTarget)}
+                               className="rounded-2xl bg-[#2f251d] px-4 py-2 text-sm font-semibold text-[#fffaf2] transition hover:bg-[#a84f24] md:px-3 md:py-1.5 md:text-xs"
                              >
                                Tambah
                              </button>
@@ -379,28 +481,28 @@ function getMockRating(productId: number) {
 
        {isCartOpen && (
          <div
-           className="fixed inset-0 z-50 bg-slate-950/50 p-4 backdrop-blur-sm"
+           className="fixed inset-0 z-50 bg-[#2b221a]/45 p-4 backdrop-blur-sm"
            onClick={() => setIsCartOpen(false)}
          >
            <div
-             className="mx-auto max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-4xl border border-slate-200 bg-white p-6 shadow-2xl"
+             className="mx-auto max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-4xl border border-[#e4d6c2] bg-[#fffaf2] p-6 shadow-2xl"
              onClick={(event) => event.stopPropagation()}
            >
              <div className="flex items-center justify-between">
                <div>
-                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-orange-600">
+                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#a84f24]">
                    Keranjang
                  </p>
-                 <h2 className="mt-1 text-2xl font-bold text-slate-950">Pesanan pelanggan</h2>
+                 <h2 className="font-display mt-1 text-2xl font-semibold text-[#2f251d]">Pesanan pelanggan</h2>
                </div>
                <div className="flex items-center gap-2">
-                 <div className="rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-600">
+                 <div className="rounded-2xl border border-[#e3d5c2] bg-[#fff6e9] px-3 py-2 text-sm font-semibold text-[#6f645a]">
                    {totalItems} item
                  </div>
                  <button
                    type="button"
                    onClick={() => setIsCartOpen(false)}
-                   className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-700 transition hover:border-orange-300 hover:text-orange-600"
+                   className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[#e3d5c2] text-[#5f564d] transition hover:border-[#d5956e] hover:text-[#a84f24]"
                    aria-label="Tutup keranjang"
                  >
                    <X className="h-4 w-4" />
@@ -410,32 +512,32 @@ function getMockRating(productId: number) {
 
              <div className="mt-6 space-y-3">
                {cart.length === 0 ? (
-                 <div className="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">
+                 <div className="rounded-2xl border border-dashed border-[#d9c8af] bg-[#fffdf8] p-5 text-sm text-[#6f645a]">
                    Belum ada menu dipilih.
                  </div>
                ) : (
                  cart.map((item) => (
-                   <div key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                   <div key={item.id} className="rounded-2xl border border-[#e6d8c4] bg-[#fffdf8] p-4">
                      <div className="flex items-start justify-between gap-4">
                        <div>
-                         <p className="font-semibold text-slate-900">{item.name}</p>
-                         <p className="text-sm text-slate-500">{formatCurrency(item.price)}</p>
+                         <p className="font-semibold text-[#2f251d]">{item.name}</p>
+                         <p className="text-sm text-[#807364]">{formatCurrency(item.price)}</p>
                        </div>
                        <div className="flex items-center gap-2">
                          <button
                            type="button"
                            onClick={() => updateQuantity(item.id, -1)}
-                           className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-lg font-bold text-slate-700 ring-1 ring-slate-200"
+                           className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#e1d3bf] bg-[#fff8ee] text-lg font-bold text-[#5f564d]"
                          >
                            −
                          </button>
-                         <span className="min-w-6 text-center font-semibold text-slate-900">
+                         <span className="min-w-6 text-center font-semibold text-[#2f251d]">
                            {item.quantity}
                          </span>
                          <button
                            type="button"
                            onClick={() => updateQuantity(item.id, 1)}
-                           className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-lg font-bold text-slate-700 ring-1 ring-slate-200"
+                           className="flex h-8 w-8 items-center justify-center rounded-xl border border-[#e1d3bf] bg-[#fff8ee] text-lg font-bold text-[#5f564d]"
                          >
                            +
                          </button>
@@ -451,12 +553,12 @@ function getMockRating(productId: number) {
                  value={customerName}
                  onChange={(event) => setCustomerName(event.target.value)}
                  placeholder="Nama pelanggan"
-                 className="rounded-2xl border border-slate-200 px-4 py-3 outline-none placeholder:text-slate-400 focus:border-orange-300"
+                 className="rounded-2xl border border-[#e1d3bf] bg-[#fffdf8] px-4 py-3 outline-none placeholder:text-[#ab9f8f] focus:border-[#d5956e]"
                />
                <select
                  value={paymentMethod}
                  onChange={(event) => setPaymentMethod(event.target.value as Order["paymentMethod"])}
-                 className="rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-orange-300"
+                 className="rounded-2xl border border-[#e1d3bf] bg-[#fffdf8] px-4 py-3 outline-none focus:border-[#d5956e]"
                >
                  <option value="cash">Tunai</option>
                  <option value="qris">QRIS</option>
@@ -467,12 +569,12 @@ function getMockRating(productId: number) {
                  onChange={(event) => setNotes(event.target.value)}
                  rows={3}
                  placeholder="Catatan pesanan"
-                 className="rounded-2xl border border-slate-200 px-4 py-3 outline-none placeholder:text-slate-400 focus:border-orange-300"
+                 className="rounded-2xl border border-[#e1d3bf] bg-[#fffdf8] px-4 py-3 outline-none placeholder:text-[#ab9f8f] focus:border-[#d5956e]"
                />
              </div>
 
-             <div className="mt-6 rounded-2xl bg-slate-950 p-5 text-white">
-               <div className="flex items-center justify-between text-sm text-slate-300">
+             <div className="mt-6 rounded-2xl bg-[#2f251d] p-5 text-[#fffaf2]">
+               <div className="flex items-center justify-between text-sm text-[#dbc9b5]">
                  <span>Subtotal</span>
                  <span>{formatCurrency(subtotal)}</span>
                </div>
@@ -484,7 +586,7 @@ function getMockRating(productId: number) {
                  type="button"
                  onClick={submitOrder}
                  disabled={isSubmitting}
-                 className="mt-5 w-full rounded-2xl bg-orange-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-60"
+                 className="mt-5 w-full rounded-2xl bg-[#d88a58] px-4 py-3 font-semibold text-[#2f251d] transition hover:bg-[#c96d3a] hover:text-[#fffaf2] disabled:cursor-not-allowed disabled:opacity-60"
                >
                  {isSubmitting ? "Memproses pesanan..." : "Pesan"}
                </button>

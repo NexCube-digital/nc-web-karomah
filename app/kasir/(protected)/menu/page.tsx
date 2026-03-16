@@ -4,6 +4,7 @@ import { ChangeEvent, DragEvent, KeyboardEvent, useCallback, useEffect, useMemo,
 import axios from "axios";
 import { ImagePlus, Pencil, ShoppingCart, Trash2, Upload, X } from "lucide-react";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
+import { CrudToast } from "@/components/CrudToast";
 import {
   createOrder,
   createMenuItem,
@@ -27,6 +28,7 @@ const emptyMenuForm: MenuFormState = {
   description: "",
   category: "",
   price: 0,
+  rating: null,
   imageUrl: "",
   imageFile: null,
   removeImage: false,
@@ -34,9 +36,12 @@ const emptyMenuForm: MenuFormState = {
   isAvailable: true,
 };
 
-function getMockRating(productId: number) {
-  const rating = 4.6 + (productId % 5) * 0.1;
-  return Math.min(rating, 5).toFixed(1);
+function formatProductRating(rating: number | null | undefined) {
+  if (typeof rating !== "number" || Number.isNaN(rating) || rating <= 0) {
+    return "Baru";
+  }
+
+  return rating.toFixed(1);
 }
 
 export default function CashierMenuPage() {
@@ -57,6 +62,7 @@ export default function CashierMenuPage() {
   const [customerName, setCustomerName] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<Order["paymentMethod"]>("cash");
+  const [selectedChickenProduct, setSelectedChickenProduct] = useState<Product | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -80,6 +86,21 @@ export default function CashierMenuPage() {
 
     return () => window.clearTimeout(timeout);
   }, [feedback, errorMessage]);
+
+  useEffect(() => {
+    const shouldLockScroll = isModalOpen || isCartModalOpen || Boolean(selectedChickenProduct);
+
+    if (!shouldLockScroll) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isModalOpen, isCartModalOpen, selectedChickenProduct]);
 
   const productStats = useMemo(
     () => ({
@@ -282,6 +303,7 @@ export default function CashierMenuPage() {
       description: product.description || "",
       category: product.category,
       price: product.price,
+      rating: product.rating,
       imageUrl: product.imageUrl || "",
       imageFile: null,
       removeImage: false,
@@ -328,10 +350,35 @@ export default function CashierMenuPage() {
     }
   }
 
+  function isChickenCategory(product: Product) {
+    return product.category.trim().toLowerCase() === "ayam goreng";
+  }
+
   function handleAddToCart(product: Product) {
+    if (isChickenCategory(product)) {
+      setSelectedChickenProduct(product);
+      return;
+    }
+
     addCartItem(product);
     setErrorMessage(null);
     setFeedback(`${product.name} ditambahkan ke keranjang kasir.`);
+  }
+
+  function handleChooseChickenCut(cut: "dada" | "paha") {
+    if (!selectedChickenProduct) {
+      return;
+    }
+
+    const label = cut === "dada" ? "Dada" : "Paha";
+    addCartItem(selectedChickenProduct, {
+      variantKey: cut,
+      displayNameSuffix: label,
+      chickenCut: cut,
+    });
+    setErrorMessage(null);
+    setFeedback(`${selectedChickenProduct.name} - ${label} ditambahkan ke keranjang kasir.`);
+    setSelectedChickenProduct(null);
   }
 
   async function handleSubmitCartOrder() {
@@ -380,31 +427,14 @@ export default function CashierMenuPage() {
 
   return (
     <div className="space-y-6">
-      {(feedback || errorMessage) && (
-        <div
-          role="status"
-          aria-live="polite"
-          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
-            errorMessage
-              ? "border-rose-200 bg-rose-50 text-rose-700"
-              : "border-emerald-200 bg-emerald-50 text-emerald-700"
-          }`}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <span>{errorMessage || feedback}</span>
-            <button
-              type="button"
-              onClick={() => {
-                setFeedback(null);
-                setErrorMessage(null);
-              }}
-              className="rounded-lg px-2 py-1 text-xs font-semibold opacity-80 transition hover:opacity-100"
-            >
-              Tutup
-            </button>
-          </div>
-        </div>
-      )}
+      <CrudToast
+        message={errorMessage || feedback}
+        isError={Boolean(errorMessage)}
+        onClose={() => {
+          setFeedback(null);
+          setErrorMessage(null);
+        }}
+      />
 
       <section className="grid gap-4 md:grid-cols-3">
         {[
@@ -495,7 +525,7 @@ export default function CashierMenuPage() {
                             overlay={
                               <>
                                 <div className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-bold text-slate-900 shadow-sm">
-                                  ★ {getMockRating(product.id)}
+                                  {typeof product.rating === "number" && product.rating > 0 ? "★" : "☆"} {formatProductRating(product.rating)}
                                 </div>
                                 <div
                                   className={`absolute right-2 top-2 rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-sm ${
@@ -561,7 +591,7 @@ export default function CashierMenuPage() {
       </section>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/50 p-4 backdrop-blur-sm" onClick={closeModal}>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm" onClick={closeModal}>
           <div
             className="mx-auto w-full max-w-6xl rounded-4xl border border-slate-200 bg-white p-6 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
@@ -705,12 +735,37 @@ export default function CashierMenuPage() {
                     </button>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-500">
-                    {menuForm.imageFile
-                      ? `File dipilih: ${menuForm.imageFile.name}`
-                      : menuForm.existingImageUrl
-                        ? "Menggunakan foto menu yang sudah tersimpan."
-                        : "Belum ada foto dipilih."}
+                  <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Penilaian bintang
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setMenuForm((current) => ({ ...current, rating: star }))}
+                          className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border text-lg transition ${
+                            (menuForm.rating || 0) >= star
+                              ? "border-amber-300 bg-amber-50 text-amber-500"
+                              : "border-slate-200 bg-white text-slate-300 hover:border-amber-200 hover:text-amber-400"
+                          }`}
+                          aria-label={`Set rating ${star} bintang`}
+                        >
+                          ★
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setMenuForm((current) => ({ ...current, rating: null }))}
+                        className="ml-1 rounded-xl border border-slate-200 px-2.5 py-2 text-xs font-semibold text-slate-600 transition hover:border-orange-300 hover:text-orange-600"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Nilai saat ini: {formatProductRating(menuForm.rating)}
+                    </p>
                   </div>
                 </div>
               </section>
@@ -824,7 +879,7 @@ export default function CashierMenuPage() {
 
       {isCartModalOpen && (
         <div
-          className="fixed inset-0 z-50 bg-slate-950/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm"
           onClick={() => setIsCartModalOpen(false)}
         >
           <div
@@ -860,7 +915,7 @@ export default function CashierMenuPage() {
                 </div>
               ) : (
                 cartItems.map((item) => (
-                  <div key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div key={item.cartKey} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-semibold text-slate-900">{item.name}</p>
@@ -869,7 +924,7 @@ export default function CashierMenuPage() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => updateCartItemQuantity(item.id, -1)}
+                          onClick={() => updateCartItemQuantity(item.cartKey, -1)}
                           className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-lg font-bold text-slate-700 ring-1 ring-slate-200"
                         >
                           -
@@ -879,7 +934,7 @@ export default function CashierMenuPage() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => updateCartItemQuantity(item.id, 1)}
+                          onClick={() => updateCartItemQuantity(item.cartKey, 1)}
                           className="flex h-8 w-8 items-center justify-center rounded-xl bg-white text-lg font-bold text-slate-700 ring-1 ring-slate-200"
                         >
                           +
@@ -932,6 +987,53 @@ export default function CashierMenuPage() {
                 className="mt-5 w-full rounded-2xl bg-orange-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-orange-300 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSubmittingOrder ? "Menyimpan..." : "Simpan"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedChickenProduct && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          onClick={() => setSelectedChickenProduct(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-orange-600">
+                  Pilih potongan ayam
+                </p>
+                <h3 className="mt-1 text-xl font-bold text-slate-950">{selectedChickenProduct.name}</h3>
+                <p className="mt-2 text-sm text-slate-500">Pilih bagian sebelum dimasukkan ke keranjang.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedChickenProduct(null)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:border-orange-300 hover:text-orange-600"
+                aria-label="Tutup modal pilihan ayam"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => handleChooseChickenCut("dada")}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-700"
+              >
+                Dada
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChooseChickenCut("paha")}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-orange-300 hover:text-orange-700"
+              >
+                Paha
               </button>
             </div>
           </div>

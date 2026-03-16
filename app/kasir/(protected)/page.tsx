@@ -82,7 +82,7 @@ export default function CashierOverviewPage() {
 
   const summaryCards = [
     { label: "Total order", value: summary.totalOrders, icon: ClipboardList },
-    { label: "Omzet", value: formatCurrency(summary.totalRevenue), icon: ReceiptText },
+    { label: "Omzet hari ini", value: formatCurrency(summary.totalRevenue), icon: ReceiptText },
     { label: "Menu aktif", value: `${productStats.active} item`, icon: UtensilsCrossed },
     { label: "Menu nonaktif", value: `${productStats.inactive} item`, icon: BarChart3 },
   ];

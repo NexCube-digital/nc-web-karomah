@@ -4,6 +4,7 @@ export type Product = {
   description: string | null;
   category: string;
   price: number;
+  rating: number | null;
   imageUrl: string | null;
   isAvailable: boolean;
 };
@@ -16,7 +17,15 @@ export type Category = {
 };
 
 export type CartItem = Product & {
+  cartKey: string;
+  chickenCut?: "dada" | "paha";
   quantity: number;
+};
+
+export type AddCartItemOptions = {
+  variantKey?: string;
+  displayNameSuffix?: string;
+  chickenCut?: "dada" | "paha";
 };
 
 export type OrderItem = {
@@ -66,6 +75,7 @@ export type MenuPayload = {
   description?: string;
   category: string;
   price: number;
+  rating?: number | null;
   imageUrl?: string | null;
   imageFile?: File | null;
   removeImage?: boolean;
@@ -75,6 +85,8 @@ export type MenuPayload = {
 export type CategoryPayload = {
   name: string;
   imageUrl: string;
+  imageFile?: File | null;
+  removeImage?: boolean;
   isActive: boolean;
 };
 

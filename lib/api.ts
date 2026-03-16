@@ -54,6 +54,11 @@ function buildMenuFormData(payload: MenuPayload) {
   formData.append("name", payload.name);
   formData.append("category", payload.category);
   formData.append("price", String(payload.price));
+  if (typeof payload.rating === "number") {
+    formData.append("rating", String(payload.rating));
+  } else {
+    formData.append("rating", "");
+  }
   formData.append("isAvailable", String(payload.isAvailable));
 
   if (typeof payload.description === "string") {
@@ -66,6 +71,25 @@ function buildMenuFormData(payload: MenuPayload) {
 
   if (payload.imageFile) {
     formData.append("image", payload.imageFile);
+  }
+
+  return formData;
+}
+
+function buildCategoryFormData(payload: CategoryPayload) {
+  const formData = new FormData();
+
+  formData.append("name", payload.name);
+  formData.append("isActive", String(payload.isActive));
+
+  if (payload.removeImage) {
+    formData.append("removeImage", "true");
+  }
+
+  if (payload.imageFile) {
+    formData.append("image", payload.imageFile);
+  } else if (typeof payload.imageUrl === "string" && payload.imageUrl.trim()) {
+    formData.append("imageUrl", payload.imageUrl);
   }
 
   return formData;
@@ -87,6 +111,10 @@ function normalizeProduct(product: Product) {
   return {
     ...product,
     price: Number(product.price),
+    rating:
+      product.rating === null || product.rating === undefined || product.rating === ("" as never)
+        ? null
+        : Number(product.rating),
     imageUrl: normalizeImageUrl(product.imageUrl),
   };
 }
@@ -96,6 +124,10 @@ function normalizeCategory(category: Category) {
     ...category,
     isActive: Boolean(category.isActive),
   };
+}
+
+function toArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
 }
 
 function authConfig(token?: string) {
@@ -116,7 +148,7 @@ function normalizeOrder(order: Order) {
     subtotal: Number(order.subtotal),
     taxAmount: Number(order.taxAmount),
     totalAmount: Number(order.totalAmount),
-    items: order.items.map((item) => ({
+    items: toArray(order.items).map((item) => ({
       ...item,
       price: Number(item.price),
       lineTotal: Number(item.lineTotal),
@@ -131,13 +163,13 @@ export function getCashierEventsUrl(token: string) {
 }
 
 export async function fetchProducts() {
-  const response = await api.get<{ success: boolean; data: Product[] }>("/products");
-  return response.data.data.map(normalizeProduct);
+  const response = await api.get<{ success: boolean; data: Product[] | null }>("/products");
+  return toArray(response.data.data).map(normalizeProduct);
 }
 
 export async function fetchCategories() {
-  const response = await api.get<{ success: boolean; data: Category[] }>("/categories");
-  return response.data.data.map(normalizeCategory);
+  const response = await api.get<{ success: boolean; data: Category[] | null }>("/categories");
+  return toArray(response.data.data).map(normalizeCategory);
 }
 
 export async function createOrder(payload: {
@@ -173,11 +205,11 @@ export async function fetchCashierProfile(token?: string) {
 }
 
 export async function fetchCashierOrders(token?: string) {
-  const response = await api.get<{ success: boolean; data: Order[] }>(
+  const response = await api.get<{ success: boolean; data: Order[] | null }>(
     "/cashier/orders",
     authConfig(token)
   );
-  return response.data.data.map(normalizeOrder);
+  return toArray(response.data.data).map(normalizeOrder);
 }
 
 export async function fetchCashierSummary(token?: string) {
@@ -192,38 +224,40 @@ export async function fetchCashierSummary(token?: string) {
 }
 
 export async function fetchManagedProducts(token?: string) {
-  const response = await api.get<{ success: boolean; data: Product[] }>(
+  const response = await api.get<{ success: boolean; data: Product[] | null }>(
     "/products/manage",
     authConfig(token)
   );
 
-  return response.data.data.map(normalizeProduct);
+  return toArray(response.data.data).map(normalizeProduct);
 }
 
 export async function fetchManagedCategories(token?: string) {
-  const response = await api.get<{ success: boolean; data: Category[] }>(
+  const response = await api.get<{ success: boolean; data: Category[] | null }>(
     "/categories/manage",
     authConfig(token)
   );
 
-  return response.data.data.map(normalizeCategory);
+  return toArray(response.data.data).map(normalizeCategory);
 }
 
 export async function createCategory(payload: CategoryPayload, token?: string) {
+  const formData = buildCategoryFormData(payload);
   const response = await api.post<{ success: boolean; data: Category }>(
     "/categories",
-    payload,
-    authConfig(token)
+    formData,
+    multipartAuthConfig(token)
   );
 
   return normalizeCategory(response.data.data);
 }
 
 export async function updateCategory(id: number, payload: CategoryPayload, token?: string) {
+  const formData = buildCategoryFormData(payload);
   const response = await api.put<{ success: boolean; data: Category }>(
     `/categories/${id}`,
-    payload,
-    authConfig(token)
+    formData,
+    multipartAuthConfig(token)
   );
 
   return normalizeCategory(response.data.data);
@@ -275,14 +309,14 @@ export async function updateCashierOrder(
 }
 
 export async function fetchCashierHistory(token?: string) {
-  const response = await api.get<{ success: boolean; data: OrderHistoryGroup[] }>(
+  const response = await api.get<{ success: boolean; data: OrderHistoryGroup[] | null }>(
     "/cashier/history",
     authConfig(token)
   );
-  return response.data.data.map((group) => ({
+  return toArray(response.data.data).map((group) => ({
     ...group,
     totalRevenue: Number(group.totalRevenue),
-    orders: group.orders.map(normalizeOrder),
+    orders: toArray(group.orders).map(normalizeOrder),
   }));
 }
 
