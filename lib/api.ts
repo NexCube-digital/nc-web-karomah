@@ -21,6 +21,19 @@ const api = axios.create({
 });
 
 const DEFAULT_PRODUCT_IMAGE = "/image/default.png";
+const FALLBACK_API_BASE_URL = "http://localhost:4000/api";
+
+function getApiBaseUrl() {
+  return api.defaults.baseURL || process.env.NEXT_PUBLIC_API_URL || FALLBACK_API_BASE_URL;
+}
+
+function getApiOrigin() {
+  try {
+    return new URL(getApiBaseUrl()).origin;
+  } catch {
+    return "http://localhost:4000";
+  }
+}
 
 function normalizeImageUrl(imageUrl: string | null | undefined) {
   if (typeof imageUrl !== "string") {
@@ -33,13 +46,31 @@ function normalizeImageUrl(imageUrl: string | null | undefined) {
     return DEFAULT_PRODUCT_IMAGE;
   }
 
-  if (/^https?:\/\//i.test(normalizedValue) || normalizedValue.startsWith("data:")) {
+  if (normalizedValue.startsWith("data:")) {
     return normalizedValue;
+  }
+
+  if (/^https?:\/\//i.test(normalizedValue)) {
+    try {
+      const originalUrl = new URL(normalizedValue);
+      const isLocalAssetHost = originalUrl.hostname === "localhost" || originalUrl.hostname === "127.0.0.1";
+      const apiOrigin = getApiOrigin();
+      const apiHostName = new URL(apiOrigin).hostname;
+
+      // Keep absolute URL as-is unless it points to local host while active API host is remote.
+      if (isLocalAssetHost && apiHostName !== "localhost" && apiHostName !== "127.0.0.1") {
+        return `${apiOrigin}${originalUrl.pathname}${originalUrl.search}${originalUrl.hash}`;
+      }
+
+      return normalizedValue;
+    } catch {
+      return normalizedValue;
+    }
   }
 
   if (normalizedValue.startsWith("/")) {
     try {
-      return new URL(normalizedValue, api.defaults.baseURL || "http://localhost:4000/api").toString();
+      return new URL(normalizedValue, getApiBaseUrl()).toString();
     } catch {
       return normalizedValue;
     }
@@ -159,7 +190,7 @@ function normalizeOrder(order: Order) {
 }
 
 export function getCashierEventsUrl(token: string) {
-  const baseUrl = api.defaults.baseURL || "http://localhost:4000/api";
+  const baseUrl = getApiBaseUrl();
   const separator = baseUrl.includes("?") ? "&" : "?";
   return `${baseUrl}/cashier/events${separator}token=${encodeURIComponent(token)}`;
 }
