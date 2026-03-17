@@ -18,10 +18,33 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   title: "Karomah Food | Pemesanan & Kasir",
   description: "Aplikasi pemesanan pelanggan dan dashboard kasir untuk rumah makan Karomah Food.",
+  metadataBase: new URL("https://menukaromahfood.netlify.app"),
   icons: {
     icon: "/image/logo.svg",
     shortcut: "/image/logo.svg",
     apple: "/image/logo.svg",
+  },
+  openGraph: {
+    title: "Karomah Food | Pemesanan & Kasir",
+    description: "Aplikasi pemesanan pelanggan dan dashboard kasir untuk rumah makan Karomah Food.",
+    url: "https://menukaromahfood.netlify.app",
+    siteName: "Karomah Food",
+    images: [
+      {
+        url: "/image/logo.svg",
+        width: 512,
+        height: 512,
+        alt: "Logo Karomah Food",
+      },
+    ],
+    locale: "id_ID",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Karomah Food | Pemesanan & Kasir",
+    description: "Aplikasi pemesanan pelanggan dan dashboard kasir untuk rumah makan Karomah Food.",
+    images: ["/image/logo.svg"],
   },
 };
 
