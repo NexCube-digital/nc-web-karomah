@@ -275,10 +275,10 @@ export default function ProtectedCashierLayout({
                 const Icon = item.icon;
 
                 if ("children" in item) {
-                  const parentActive = item.children.some((child) => pathname === child.href);
+                  const parentActive = item.children!.some((child) => pathname === child.href);
 
                   if (isSidebarMinimized) {
-                    const activeChild = item.children.find((child) => pathname === child.href) || item.children[0];
+                    const activeChild = item.children!.find((child) => pathname === child.href) || item.children![0];
 
                     return (
                       <Link
@@ -321,7 +321,7 @@ export default function ProtectedCashierLayout({
 
                       {isQueueMenuExpanded && (
                         <div className="space-y-1 pl-6">
-                          {item.children.map((child) => {
+                          {item.children!.map((child) => {
                             const childActive = pathname === child.href;
 
                             return (
@@ -450,7 +450,7 @@ export default function ProtectedCashierLayout({
                     if ("children" in item) {
                       return (
                         <Fragment key={item.label}>
-                          {item.children.map((child) => {
+                          {item.children!.map((child) => {
                             const active = pathname === child.href;
 
                             return (
