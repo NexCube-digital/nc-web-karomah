@@ -14,6 +14,16 @@ import { ProductThumbnail } from "@/components/ProductThumbnail";
    return `kategori-${category.toLowerCase().replace(/\s+/g, "-")}`;
  }
 
+function getApiOrigin() {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+
+  try {
+    return new URL(baseUrl).origin;
+  } catch {
+    return "http://localhost:4000";
+  }
+}
+
 function formatProductRating(rating: number | null | undefined) {
   if (typeof rating !== "number" || Number.isNaN(rating) || rating <= 0) {
     return "Baru";
@@ -391,7 +401,7 @@ function formatProductRating(rating: number | null | undefined) {
                    <img
                      src={
                        category.imageUrl?.startsWith("/uploads/")
-                         ? `http://localhost:4000${category.imageUrl}`
+                         ? `${getApiOrigin()}${category.imageUrl}`
                          : category.imageUrl
                      }
                      alt={category.name}

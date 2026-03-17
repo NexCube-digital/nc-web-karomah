@@ -29,6 +29,16 @@ const emptyForm: CategoryFormState = {
   isActive: true,
 };
 
+function getApiOrigin() {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+
+  try {
+    return new URL(baseUrl).origin;
+  } catch {
+    return "http://localhost:4000";
+  }
+}
+
 export default function CashierCategoriesPage() {
   const { token } = useCashierContext();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -318,7 +328,7 @@ export default function CashierCategoriesPage() {
                       <img
                         src={
                           category.imageUrl?.startsWith("/uploads/")
-                            ? `http://localhost:4000${category.imageUrl}`
+                            ? `${getApiOrigin()}${category.imageUrl}`
                             : category.imageUrl || "/image/default.png"
                         }
                         alt={category.name}
@@ -421,7 +431,7 @@ export default function CashierCategoriesPage() {
                     ) : form.imageUrl.startsWith("/uploads/") ? (
                       // Uploaded image from server
                       <Image
-                        src={`http://localhost:4000${form.imageUrl}`}
+                        src={`${getApiOrigin()}${form.imageUrl}`}
                         alt={form.name}
                         width={128}
                         height={128}

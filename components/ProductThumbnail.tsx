@@ -4,6 +4,16 @@ import { ReactNode, useEffect, useState } from "react";
 
 const DEFAULT_PRODUCT_IMAGE = "/image/default.png";
 
+function getApiOrigin() {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+
+  try {
+    return new URL(baseUrl).origin;
+  } catch {
+    return "http://localhost:4000";
+  }
+}
+
 function getSafeImageUrl(imageUrl: string | null | undefined) {
   if (typeof imageUrl !== "string") {
     return DEFAULT_PRODUCT_IMAGE;
@@ -17,7 +27,17 @@ function getSafeImageUrl(imageUrl: string | null | undefined) {
 
   // Handle API-served images (from uploads folder)
   if (normalizedValue.startsWith("/uploads/")) {
-    return `http://localhost:4000${normalizedValue}`;
+    return `${getApiOrigin()}${normalizedValue}`;
+  }
+
+  // Rewrite legacy absolute localhost image URL to active API host.
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//i.test(normalizedValue)) {
+    try {
+      const parsed = new URL(normalizedValue);
+      return `${getApiOrigin()}${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } catch {
+      return normalizedValue;
+    }
   }
 
   return normalizedValue;
