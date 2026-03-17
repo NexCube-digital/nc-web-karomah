@@ -1,5 +1,5 @@
 [build]
-  base    = "nc-web-karomah"
+  base    = "."
   command = "npm run build"
   publish = ".next"
 
