@@ -193,7 +193,7 @@ function formatProductRating(rating: number | null | undefined) {
          );
        }
 
-       return [...currentCart, { ...product, quantity: 1 }];
+       return [...currentCart, { ...product, cartKey: String(product.id), quantity: 1 }];
      });
    }
 
